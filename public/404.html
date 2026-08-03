@@ -7,9 +7,10 @@
   </head>
   <body>
     <script>
+      const repoName = 'Clases-Finanzas'
       const path = window.location.pathname.replace(/\/$/, '')
-      const repoName = 'facupadel'
-      const redirectPath = `${window.location.protocol}//${window.location.host}/${repoName}${path}${window.location.search}${window.location.hash}`
+      const cleanPath = path.endsWith(`/${repoName}`) ? '' : path
+      const redirectPath = `${window.location.protocol}//${window.location.host}/${repoName}${cleanPath}${window.location.search}${window.location.hash}`
       window.location.replace(redirectPath)
     </script>
   </body>

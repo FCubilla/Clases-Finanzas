@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const repoName = process.env.GITHUB_REPOSITORY?.split('/').pop() ?? 'facupadel'
+const repoName = 'Clases-Finanzas'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
