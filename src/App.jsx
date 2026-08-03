@@ -205,9 +205,7 @@ function App() {
     const savedPercent = Number(savedPercentRaw)
 
     if (!Number.isNaN(savedPercent) && savedPercent >= 0 && savedPercent <= 100) {
-      if (savedPercent !== 30) {
-        setClubPercent(savedPercent)
-      }
+      setClubPercent(savedPercent)
     } else {
       setClubPercent(40)
     }
@@ -227,8 +225,7 @@ function App() {
 
   useEffect(() => {
     if (view !== 'admin' || !cloudEnabled) return
-    syncFromCloud()
-  }, [view, cloudEnabled, syncFromCloud])
+  }, [view, cloudEnabled])
 
   const filteredClasses = useMemo(
     () => classes.filter((item) => item.date.startsWith(filterMonth)),
