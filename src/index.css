@@ -80,6 +80,17 @@ body {
   border-color: var(--moss);
 }
 
+.admin-nav-btn {
+  border: 0;
+  background: #0f2f5b;
+  color: #fff;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(15, 47, 91, 0.22);
+}
+
 .landing,
 .login-box,
 .dashboard {

@@ -519,6 +519,9 @@ function App() {
           >
             Landing
           </button>
+          <button type="button" className="admin-nav-btn" onClick={() => setView('admin-login')}>
+            Administración
+          </button>
         </nav>
       </header>
 
