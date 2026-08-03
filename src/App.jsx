@@ -132,7 +132,6 @@ function App() {
   const [view, setView] = useState('public')
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState('')
-  const [brandTapCount, setBrandTapCount] = useState(0)
 
   const [classes, setClasses] = useState([])
   const [expenses, setExpenses] = useState([])
@@ -490,14 +489,7 @@ function App() {
   }
 
   function handleBrandTap() {
-    setBrandTapCount((current) => {
-      const nextCount = current + 1
-      if (nextCount >= 5) {
-        setView('admin-login')
-        return 0
-      }
-      return nextCount
-    })
+    setView('admin-login')
   }
 
   return (
