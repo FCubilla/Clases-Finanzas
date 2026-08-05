@@ -308,6 +308,38 @@ function App() {
     }
   }, [filteredClasses, filteredExpenses, clubPercent])
 
+  const weeklySummary = useMemo(() => {
+    const today = new Date()
+    const day = today.getDay()
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - ((day + 6) % 7))
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+
+    const weekStart = monday.toISOString().slice(0, 10)
+    const weekEnd = sunday.toISOString().slice(0, 10)
+    const weekClasses = classes.filter((item) => item.date >= weekStart && item.date <= weekEnd)
+    const allPayments = weekClasses.flatMap((item) => getPayments(item))
+    const paidPayments = allPayments.filter((payment) => payment.paid)
+    const charged = paidPayments.reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
+    const cash = paidPayments
+      .filter((payment) => payment.paymentMethod === 'Efectivo')
+      .reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
+    const transfer = paidPayments
+      .filter((payment) => payment.paymentMethod === 'Transferencia')
+      .reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
+    const clubShare = charged * (clubPercent / 100)
+
+    return {
+      weekStart,
+      weekEnd,
+      charged,
+      cash,
+      transfer,
+      clubShare,
+    }
+  }, [classes, clubPercent])
+
   function updatePayment(index, key, value) {
     setClassForm((current) => ({
       ...current,
@@ -612,6 +644,31 @@ function App() {
           {cloudEnabled && syncMessage && <p className="sync-message">{syncMessage}</p>}
 
           <section className="single-form-section">
+            <div className="weekly-summary-card">
+              <h3>Resumen semanal para rendir</h3>
+              <p>
+                Semana: {weeklySummary.weekStart} al {weeklySummary.weekEnd}
+              </p>
+              <div className="weekly-summary-grid">
+                <div>
+                  <span>Cobrado</span>
+                  <strong>{money(weeklySummary.charged)}</strong>
+                </div>
+                <div>
+                  <span>Rendir al club ({clubPercent}%)</span>
+                  <strong>{money(weeklySummary.clubShare)}</strong>
+                </div>
+                <div>
+                  <span>Efectivo</span>
+                  <strong>{money(weeklySummary.cash)}</strong>
+                </div>
+                <div>
+                  <span>Transferencia</span>
+                  <strong>{money(weeklySummary.transfer)}</strong>
+                </div>
+              </div>
+            </div>
+
             <form onSubmit={handleClassSubmit}>
               <h3>Nueva clase</h3>
               <input

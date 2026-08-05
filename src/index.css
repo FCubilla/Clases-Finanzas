@@ -256,6 +256,47 @@ form,
   max-width: 560px;
 }
 
+.weekly-summary-card {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(110deg, rgba(18, 58, 122, 0.12), rgba(31, 79, 163, 0.08));
+}
+
+.weekly-summary-card h3 {
+  margin-bottom: 0.4rem;
+}
+
+.weekly-summary-card p {
+  margin: 0 0 0.75rem;
+  color: var(--soft);
+}
+
+.weekly-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.weekly-summary-grid div {
+  padding: 0.7rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+}
+
+.weekly-summary-grid span {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--soft);
+  margin-bottom: 0.25rem;
+}
+
+.weekly-summary-grid strong {
+  font-size: 1rem;
+}
+
 .single-form-section.bottom-gap {
   margin-top: 1.3rem;
 }
@@ -469,6 +510,10 @@ li span {
 
   .payment-row {
     gap: 0.5rem;
+  }
+
+  .weekly-summary-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   li {
