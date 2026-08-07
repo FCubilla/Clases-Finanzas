@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 const CLASSES_KEY = 'facupadel_classes'
 const EXPENSES_KEY = 'facupadel_expenses'
 const CLUB_PERCENT_KEY = 'facupadel_club_percent'
+const RENDITIONS_KEY = 'facupadel_renditions'
 const ACCESS_PIN = '1234'
 const SHEETS_API_URL = import.meta.env.VITE_SHEETS_API_URL?.trim()
 const SHEETS_API_TOKEN = import.meta.env.VITE_SHEETS_API_TOKEN?.trim()
@@ -138,9 +139,11 @@ function App() {
   const [classForm, setClassForm] = useState(initialClass)
   const [expenseForm, setExpenseForm] = useState(initialExpense)
   const [clubPercent, setClubPercent] = useState(40)
+  const [renditions, setRenditions] = useState([])
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
   const [syncMessage, setSyncMessage] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
+  const [renditionMessage, setRenditionMessage] = useState('')
   const recordsRef = useRef(null)
   const cloudEnabled = Boolean(SHEETS_API_URL)
 
@@ -200,6 +203,7 @@ function App() {
   useEffect(() => {
     setClasses(parseStorage(CLASSES_KEY))
     setExpenses(parseStorage(EXPENSES_KEY))
+    setRenditions(parseStorage(RENDITIONS_KEY))
 
     const savedPercentRaw = localStorage.getItem(CLUB_PERCENT_KEY)
     const savedPercent = Number(savedPercentRaw)
@@ -222,6 +226,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(CLUB_PERCENT_KEY, String(clubPercent))
   }, [clubPercent])
+
+  useEffect(() => {
+    localStorage.setItem(RENDITIONS_KEY, JSON.stringify(renditions))
+  }, [renditions])
 
   useEffect(() => {
     if (view !== 'admin' || !cloudEnabled) return
@@ -329,6 +337,10 @@ function App() {
       .filter((payment) => payment.paymentMethod === 'Transferencia')
       .reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
     const clubShare = charged * (clubPercent / 100)
+    const renderedThisWeek = renditions
+      .filter((item) => item.weekStart === weekStart && item.weekEnd === weekEnd)
+      .reduce((acc, item) => acc + Number(item.amount ?? 0), 0)
+    const pendingToRender = Math.max(clubShare - renderedThisWeek, 0)
 
     return {
       weekStart,
@@ -337,8 +349,10 @@ function App() {
       cash,
       transfer,
       clubShare,
+      renderedThisWeek,
+      pendingToRender,
     }
-  }, [classes, clubPercent])
+  }, [classes, clubPercent, renditions])
 
   function updatePayment(index, key, value) {
     setClassForm((current) => ({
@@ -444,6 +458,30 @@ function App() {
     requestAnimationFrame(() => {
       recordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
+  }
+
+  async function markWeekAsRendered() {
+    if (weeklySummary.pendingToRender <= 0) {
+      setRenditionMessage('Esta semana ya quedó marcada como rendida')
+      setSyncMessage('Esta semana ya quedó marcada como rendida')
+      return
+    }
+
+    const newRendition = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString().slice(0, 10),
+      weekStart: weeklySummary.weekStart,
+      weekEnd: weeklySummary.weekEnd,
+      amount: weeklySummary.pendingToRender,
+      cash: weeklySummary.cash,
+      transfer: weeklySummary.transfer,
+      notes: '',
+    }
+
+    const nextRenditions = [newRendition, ...renditions]
+    setRenditions(nextRenditions)
+    setRenditionMessage(`Listo, se registró la rendición de ${money(weeklySummary.pendingToRender)}.`)
+    setSyncMessage('Rendición guardada. El resumen semanal quedó listo para la próxima semana.')
   }
 
   async function togglePaid(id) {
@@ -651,11 +689,11 @@ function App() {
               </p>
               <div className="weekly-summary-grid">
                 <div>
-                  <span>Cobrado</span>
-                  <strong>{money(weeklySummary.charged)}</strong>
+                  <span>Lo que todavía no rendí</span>
+                  <strong>{money(weeklySummary.pendingToRender)}</strong>
                 </div>
                 <div>
-                  <span>Rendir al club ({clubPercent}%)</span>
+                  <span>Total de la semana</span>
                   <strong>{money(weeklySummary.clubShare)}</strong>
                 </div>
                 <div>
@@ -667,6 +705,17 @@ function App() {
                   <strong>{money(weeklySummary.transfer)}</strong>
                 </div>
               </div>
+              <div className="weekly-summary-actions">
+                <button type="button" className="render-button" onClick={markWeekAsRendered}>
+                  {weeklySummary.pendingToRender > 0 ? 'Marcar como rendido' : 'Ya rendido esta semana'}
+                </button>
+                <span className="weekly-summary-status">
+                  {weeklySummary.pendingToRender > 0
+                    ? `Falta rendir: ${money(weeklySummary.pendingToRender)}`
+                    : 'Todo ya quedó rendido para esta semana'}
+                </span>
+              </div>
+              {renditionMessage && <p className="rendition-message">{renditionMessage}</p>}
             </div>
 
             <form onSubmit={handleClassSubmit}>
