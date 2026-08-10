@@ -326,8 +326,22 @@ function App() {
 
     const weekStart = monday.toISOString().slice(0, 10)
     const weekEnd = sunday.toISOString().slice(0, 10)
-    const weekClasses = classes.filter((item) => item.date >= weekStart && item.date <= weekEnd)
-    const allPayments = weekClasses.flatMap((item) => getPayments(item))
+    const todayValue = today.toISOString().slice(0, 10)
+    const lastRenditionDate = renditions
+      .map((item) => item.date)
+      .sort()
+      .at(-1)
+
+    const periodStart = lastRenditionDate || weekStart
+    const periodClasses = classes.filter((item) => {
+      if (lastRenditionDate) {
+        return item.date > lastRenditionDate && item.date <= todayValue
+      }
+
+      return item.date >= weekStart && item.date <= weekEnd
+    })
+
+    const allPayments = periodClasses.flatMap((item) => getPayments(item))
     const paidPayments = allPayments.filter((payment) => payment.paid)
     const charged = paidPayments.reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
     const cash = paidPayments
@@ -338,13 +352,15 @@ function App() {
       .reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
     const clubShare = charged * (clubPercent / 100)
     const renderedThisWeek = renditions
-      .filter((item) => item.weekStart === weekStart && item.weekEnd === weekEnd)
+      .filter((item) => item.date >= periodStart && item.date <= todayValue)
       .reduce((acc, item) => acc + Number(item.amount ?? 0), 0)
     const pendingToRender = Math.max(clubShare - renderedThisWeek, 0)
 
     return {
       weekStart,
       weekEnd,
+      periodStart,
+      periodLabel: lastRenditionDate ? `Desde ${periodStart} hasta hoy` : `Semana: ${weekStart} al ${weekEnd}`,
       charged,
       cash,
       transfer,
@@ -684,9 +700,7 @@ function App() {
           <section className="single-form-section">
             <div className="weekly-summary-card">
               <h3>Resumen semanal para rendir</h3>
-              <p>
-                Semana: {weeklySummary.weekStart} al {weeklySummary.weekEnd}
-              </p>
+              <p>{weeklySummary.periodLabel}</p>
               <div className="weekly-summary-grid">
                 <div>
                   <span>Lo que todavía no rendí</span>
