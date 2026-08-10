@@ -20,14 +20,14 @@ function createPayment(overrides = {}) {
 }
 
 const initialClass = {
-  date: new Date().toISOString().slice(0, 10),
+  date: getLocalDateString(),
   type: 'Individual',
   payments: [createPayment()],
   notes: '',
 }
 
 const initialExpense = {
-  date: new Date().toISOString().slice(0, 10),
+  date: getLocalDateString(),
   concept: '',
   amount: '',
   category: 'Cancha',
@@ -48,6 +48,36 @@ function money(value) {
     currency: 'ARS',
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getLocalMonthString(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
+function normalizeDateInput(value) {
+  if (!value) return getLocalDateString()
+
+  const trimmed = String(value).slice(0, 10)
+  const [yearRaw, monthRaw, dayRaw] = trimmed.split('-')
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+
+  if ([year, month, day].some((item) => Number.isNaN(item))) {
+    return getLocalDateString()
+  }
+
+  const parsed = new Date(year, month - 1, day)
+  return getLocalDateString(parsed)
 }
 
 function getPayments(item) {
@@ -100,7 +130,7 @@ function normalizeClass(item) {
 
   return {
     id: item?.id ?? crypto.randomUUID(),
-    date: item?.date ?? new Date().toISOString().slice(0, 10),
+    date: normalizeDateInput(item?.date),
     student: getClassDisplayName(item),
     type: item?.type ?? 'Individual',
     amount,
@@ -114,10 +144,23 @@ function normalizeClass(item) {
 function normalizeExpense(item) {
   return {
     id: item?.id ?? crypto.randomUUID(),
-    date: item?.date ?? new Date().toISOString().slice(0, 10),
+    date: normalizeDateInput(item?.date),
     concept: item?.concept ?? '',
     amount: Number(item?.amount ?? 0),
     category: item?.category ?? 'Cancha',
+    notes: item?.notes ?? '',
+  }
+}
+
+function normalizeRendition(item) {
+  return {
+    id: item?.id ?? crypto.randomUUID(),
+    date: normalizeDateInput(item?.date),
+    weekStart: normalizeDateInput(item?.weekStart),
+    weekEnd: normalizeDateInput(item?.weekEnd),
+    amount: Number(item?.amount ?? 0),
+    cash: Number(item?.cash ?? 0),
+    transfer: Number(item?.transfer ?? 0),
     notes: item?.notes ?? '',
   }
 }
@@ -140,7 +183,7 @@ function App() {
   const [expenseForm, setExpenseForm] = useState(initialExpense)
   const [clubPercent, setClubPercent] = useState(40)
   const [renditions, setRenditions] = useState([])
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [filterMonth, setFilterMonth] = useState(getLocalMonthString())
   const [syncMessage, setSyncMessage] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
   const [renditionMessage, setRenditionMessage] = useState('')
@@ -201,9 +244,9 @@ function App() {
   }, [callSheetsApi, classes, cloudEnabled, expenses, pushSnapshot])
 
   useEffect(() => {
-    setClasses(parseStorage(CLASSES_KEY))
-    setExpenses(parseStorage(EXPENSES_KEY))
-    setRenditions(parseStorage(RENDITIONS_KEY))
+    setClasses(parseStorage(CLASSES_KEY).map(normalizeClass))
+    setExpenses(parseStorage(EXPENSES_KEY).map(normalizeExpense))
+    setRenditions(parseStorage(RENDITIONS_KEY).map(normalizeRendition))
 
     const savedPercentRaw = localStorage.getItem(CLUB_PERCENT_KEY)
     const savedPercent = Number(savedPercentRaw)
@@ -246,7 +289,7 @@ function App() {
   )
 
   const todaySummary = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = getLocalDateString()
     const todayClasses = classes.filter((item) => item.date === today)
     const allPayments = todayClasses.flatMap((item) => getPayments(item))
     const gross = allPayments.reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
@@ -324,9 +367,9 @@ function App() {
     const sunday = new Date(monday)
     sunday.setDate(monday.getDate() + 6)
 
-    const weekStart = monday.toISOString().slice(0, 10)
-    const weekEnd = sunday.toISOString().slice(0, 10)
-    const todayValue = today.toISOString().slice(0, 10)
+    const weekStart = getLocalDateString(monday)
+    const weekEnd = getLocalDateString(sunday)
+    const todayValue = getLocalDateString(today)
     const lastRenditionDate = renditions
       .map((item) => item.date)
       .sort()
@@ -485,7 +528,7 @@ function App() {
 
     const newRendition = {
       id: crypto.randomUUID(),
-      date: new Date().toISOString().slice(0, 10),
+      date: getLocalDateString(),
       weekStart: weeklySummary.weekStart,
       weekEnd: weeklySummary.weekEnd,
       amount: weeklySummary.pendingToRender,
