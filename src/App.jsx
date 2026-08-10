@@ -335,7 +335,7 @@ function App() {
     const periodStart = lastRenditionDate || weekStart
     const periodClasses = classes.filter((item) => {
       if (lastRenditionDate) {
-        return item.date > lastRenditionDate && item.date <= todayValue
+        return item.date >= lastRenditionDate && item.date <= todayValue
       }
 
       return item.date >= weekStart && item.date <= weekEnd
