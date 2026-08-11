@@ -80,6 +80,12 @@ function normalizeDateInput(value) {
   return getLocalDateString(parsed)
 }
 
+function addDaysToDate(value, days) {
+  const date = new Date(`${value}T12:00:00`)
+  date.setDate(date.getDate() + days)
+  return getLocalDateString(date)
+}
+
 function getPayments(item) {
   if (Array.isArray(item?.payments) && item.payments.length > 0) {
     return item.payments.map((payment, index) => ({
@@ -367,13 +373,8 @@ function App() {
     const today = new Date()
     const todayValue = getLocalDateString(today)
     const sortedRenditionDates = [...renditions.map((item) => item.date)].sort()
-    const lastRenditionDate = sortedRenditionDates.at(-1) ?? todayValue
-    const previousClassDate = classes
-      .map((item) => item.date)
-      .filter((date) => date < lastRenditionDate)
-      .sort()
-      .at(-1)
-    const periodStart = previousClassDate || lastRenditionDate
+    const lastRenditionDate = sortedRenditionDates.at(-1) ?? null
+    const periodStart = lastRenditionDate ? addDaysToDate(lastRenditionDate, -3) : todayValue
     const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
