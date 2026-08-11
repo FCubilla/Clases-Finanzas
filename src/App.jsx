@@ -392,10 +392,14 @@ function App() {
     const weekStart = getLocalDateString(monday)
     const weekEnd = getLocalDateString(sunday)
     const todayValue = getLocalDateString(today)
-    const periodStart = currentPeriodStart || weekStart
+    const lastRenditionDate = renditions
+      .map((item) => item.date)
+      .sort()
+      .at(-1)
+    const periodStart = currentPeriodStart || lastRenditionDate || weekStart
     const periodClasses = classes.filter((item) => {
-      if (currentPeriodStart) {
-        return item.date >= currentPeriodStart && item.date <= todayValue
+      if (currentPeriodStart || lastRenditionDate) {
+        return item.date >= periodStart && item.date <= todayValue
       }
 
       return item.date >= weekStart && item.date <= weekEnd
