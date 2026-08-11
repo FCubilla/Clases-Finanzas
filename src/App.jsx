@@ -400,7 +400,7 @@ function App() {
       weekStart,
       weekEnd,
       periodStart,
-      periodLabel: lastRenditionDate ? `Desde ${periodStart} hasta hoy` : `Semana: ${weekStart} al ${weekEnd}`,
+      periodLabel: `Desde ${periodStart} hasta hoy`,
       charged,
       cash,
       transfer,
