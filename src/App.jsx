@@ -374,11 +374,9 @@ function App() {
     const weekStart = getLocalDateString(monday)
     const weekEnd = getLocalDateString(sunday)
     const todayValue = getLocalDateString(today)
-    const lastRenditionDate = renditions
-      .map((item) => item.date)
-      .sort()
-      .at(-1)
-    const periodStart = lastRenditionDate || weekStart
+    const sortedRenditionDates = [...renditions.map((item) => item.date)].sort()
+    const previousRenditionDate = sortedRenditionDates.at(-2) ?? sortedRenditionDates.at(-1) ?? null
+    const periodStart = previousRenditionDate || weekStart
     const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
