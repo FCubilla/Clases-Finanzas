@@ -4,6 +4,7 @@ const CLASSES_KEY = 'facupadel_classes'
 const EXPENSES_KEY = 'facupadel_expenses'
 const CLUB_PERCENT_KEY = 'facupadel_club_percent'
 const RENDITIONS_KEY = 'facupadel_renditions'
+const RENDITION_PERIOD_START_KEY = 'facupadel_rendition_period_start'
 const ACCESS_PIN = '1234'
 const SHEETS_API_URL = import.meta.env.VITE_SHEETS_API_URL?.trim()
 const SHEETS_API_TOKEN = import.meta.env.VITE_SHEETS_API_TOKEN?.trim()
@@ -189,6 +190,7 @@ function App() {
   const [expenseForm, setExpenseForm] = useState(initialExpense)
   const [clubPercent, setClubPercent] = useState(40)
   const [renditions, setRenditions] = useState([])
+  const [renditionPeriodStart, setRenditionPeriodStart] = useState(getLocalDateString())
   const [filterMonth, setFilterMonth] = useState(getLocalMonthString())
   const [syncMessage, setSyncMessage] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
@@ -258,6 +260,11 @@ function App() {
     setExpenses(storedExpenses)
     setRenditions(storedRenditions)
 
+    const savedPeriodStart = localStorage.getItem(RENDITION_PERIOD_START_KEY)
+    const lastRenditionDate = [...storedRenditions.map((item) => item.date)].sort().at(-1)
+    const fallbackPeriodStart = lastRenditionDate ?? getLocalDateString()
+    setRenditionPeriodStart(savedPeriodStart ? normalizeDateInput(savedPeriodStart) : fallbackPeriodStart)
+
     const savedPercentRaw = localStorage.getItem(CLUB_PERCENT_KEY)
     const savedPercent = Number(savedPercentRaw)
 
@@ -283,6 +290,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(RENDITIONS_KEY, JSON.stringify(renditions))
   }, [renditions])
+
+  useEffect(() => {
+    localStorage.setItem(RENDITION_PERIOD_START_KEY, renditionPeriodStart)
+  }, [renditionPeriodStart])
 
   useEffect(() => {
     if (view !== 'admin' || !cloudEnabled) return
@@ -372,9 +383,8 @@ function App() {
   const renditionSummary = useMemo(() => {
     const today = new Date()
     const todayValue = getLocalDateString(today)
-    const sortedRenditionDates = [...renditions.map((item) => item.date)].sort()
-    const lastRenditionDate = sortedRenditionDates.at(-1) ?? null
-    const periodStart = lastRenditionDate ?? todayValue
+    const finalPeriodStart = normalizeDateInput(renditionPeriodStart || getLocalDateString())
+    const periodStart = finalPeriodStart
     const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
@@ -402,7 +412,7 @@ function App() {
       renderedSoFar,
       pendingToRender,
     }
-  }, [classes, clubPercent, renditions])
+  }, [classes, clubPercent, renditionPeriodStart, renditions])
 
   function updatePayment(index, key, value) {
     setClassForm((current) => ({
@@ -734,6 +744,15 @@ function App() {
           <section className="single-form-section">
             <div className="weekly-summary-card">
               <h3>Resumen para rendir</h3>
+              <div className="rendition-period-controls">
+                <label htmlFor="rendition-period-start">Desde</label>
+                <input
+                  id="rendition-period-start"
+                  type="date"
+                  value={renditionPeriodStart}
+                  onChange={(event) => setRenditionPeriodStart(normalizeDateInput(event.target.value))}
+                />
+              </div>
               <p>{renditionSummary.periodLabel}</p>
               <div className="weekly-summary-grid">
                 <div>
