@@ -379,13 +379,7 @@ function App() {
       .sort()
       .at(-1)
     const periodStart = lastRenditionDate || weekStart
-    const periodClasses = classes.filter((item) => {
-      if (lastRenditionDate) {
-        return item.date >= periodStart && item.date <= todayValue
-      }
-
-      return item.date >= weekStart && item.date <= weekEnd
-    })
+    const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
     const paidPayments = allPayments.filter((payment) => payment.paid)
