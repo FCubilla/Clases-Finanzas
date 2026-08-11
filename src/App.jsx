@@ -363,20 +363,12 @@ function App() {
     }
   }, [filteredClasses, filteredExpenses, clubPercent])
 
-  const weeklySummary = useMemo(() => {
+  const renditionSummary = useMemo(() => {
     const today = new Date()
-    const day = today.getDay()
-    const monday = new Date(today)
-    monday.setDate(today.getDate() - ((day + 6) % 7))
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
-
-    const weekStart = getLocalDateString(monday)
-    const weekEnd = getLocalDateString(sunday)
     const todayValue = getLocalDateString(today)
     const sortedRenditionDates = [...renditions.map((item) => item.date)].sort()
-    const previousRenditionDate = sortedRenditionDates.at(-2) ?? sortedRenditionDates.at(-1) ?? null
-    const periodStart = previousRenditionDate || weekStart
+    const lastRenditionDate = sortedRenditionDates.at(-1) ?? null
+    const periodStart = lastRenditionDate || todayValue
     const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
@@ -389,21 +381,19 @@ function App() {
       .filter((payment) => payment.paymentMethod === 'Transferencia')
       .reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
     const clubShare = charged * (clubPercent / 100)
-    const renderedThisWeek = renditions
+    const renderedSoFar = renditions
       .filter((item) => item.date >= periodStart && item.date <= todayValue)
       .reduce((acc, item) => acc + Number(item.amount ?? 0), 0)
-    const pendingToRender = Math.max(clubShare - renderedThisWeek, 0)
+    const pendingToRender = Math.max(clubShare - renderedSoFar, 0)
 
     return {
-      weekStart,
-      weekEnd,
       periodStart,
       periodLabel: `Desde ${periodStart} hasta hoy`,
       charged,
       cash,
       transfer,
       clubShare,
-      renderedThisWeek,
+      renderedSoFar,
       pendingToRender,
     }
   }, [classes, clubPercent, renditions])
@@ -514,28 +504,28 @@ function App() {
     })
   }
 
-  async function markWeekAsRendered() {
-    if (weeklySummary.pendingToRender <= 0) {
-      setRenditionMessage('Esta semana ya quedó marcada como rendida')
-      setSyncMessage('Esta semana ya quedó marcada como rendida')
+  async function markPeriodAsRendered() {
+    if (renditionSummary.pendingToRender <= 0) {
+      setRenditionMessage('Este periodo ya quedó marcado como rendido')
+      setSyncMessage('Este periodo ya quedó marcado como rendido')
       return
     }
 
     const newRendition = {
       id: crypto.randomUUID(),
       date: getLocalDateString(),
-      weekStart: weeklySummary.weekStart,
-      weekEnd: weeklySummary.weekEnd,
-      amount: weeklySummary.pendingToRender,
-      cash: weeklySummary.cash,
-      transfer: weeklySummary.transfer,
+      weekStart: renditionSummary.periodStart,
+      weekEnd: getLocalDateString(),
+      amount: renditionSummary.pendingToRender,
+      cash: renditionSummary.cash,
+      transfer: renditionSummary.transfer,
       notes: '',
     }
 
     const nextRenditions = [newRendition, ...renditions]
     setRenditions(nextRenditions)
-    setRenditionMessage(`Listo, se registró la rendición de ${money(weeklySummary.pendingToRender)}.`)
-    setSyncMessage('Rendición guardada. El resumen semanal quedó listo para la próxima semana.')
+    setRenditionMessage(`Listo, se registró la rendición de ${money(renditionSummary.pendingToRender)}.`)
+    setSyncMessage('Rendición guardada. El resumen quedó listo para el próximo periodo.')
   }
 
   async function togglePaid(id) {
@@ -737,34 +727,34 @@ function App() {
 
           <section className="single-form-section">
             <div className="weekly-summary-card">
-              <h3>Resumen semanal para rendir</h3>
-              <p>{weeklySummary.periodLabel}</p>
+              <h3>Resumen para rendir</h3>
+              <p>{renditionSummary.periodLabel}</p>
               <div className="weekly-summary-grid">
                 <div>
                   <span>Lo que todavía no rendí</span>
-                  <strong>{money(weeklySummary.pendingToRender)}</strong>
+                  <strong>{money(renditionSummary.pendingToRender)}</strong>
                 </div>
                 <div>
-                  <span>Total de la semana</span>
-                  <strong>{money(weeklySummary.clubShare)}</strong>
+                  <span>Total del periodo</span>
+                  <strong>{money(renditionSummary.clubShare)}</strong>
                 </div>
                 <div>
                   <span>Efectivo</span>
-                  <strong>{money(weeklySummary.cash)}</strong>
+                  <strong>{money(renditionSummary.cash)}</strong>
                 </div>
                 <div>
                   <span>Transferencia</span>
-                  <strong>{money(weeklySummary.transfer)}</strong>
+                  <strong>{money(renditionSummary.transfer)}</strong>
                 </div>
               </div>
               <div className="weekly-summary-actions">
-                <button type="button" className="render-button" onClick={markWeekAsRendered}>
-                  {weeklySummary.pendingToRender > 0 ? 'Marcar como rendido' : 'Ya rendido esta semana'}
+                <button type="button" className="render-button" onClick={markPeriodAsRendered}>
+                  {renditionSummary.pendingToRender > 0 ? 'Marcar como rendido' : 'Ya rendido'}
                 </button>
                 <span className="weekly-summary-status">
-                  {weeklySummary.pendingToRender > 0
-                    ? `Falta rendir: ${money(weeklySummary.pendingToRender)}`
-                    : 'Todo ya quedó rendido para esta semana'}
+                  {renditionSummary.pendingToRender > 0
+                    ? `Falta rendir: ${money(renditionSummary.pendingToRender)}`
+                    : 'Todo ya quedó rendido para este periodo'}
                 </span>
               </div>
               {renditionMessage && <p className="rendition-message">{renditionMessage}</p>}
