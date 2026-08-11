@@ -374,7 +374,7 @@ function App() {
     const todayValue = getLocalDateString(today)
     const sortedRenditionDates = [...renditions.map((item) => item.date)].sort()
     const lastRenditionDate = sortedRenditionDates.at(-1) ?? null
-    const periodStart = lastRenditionDate ? addDaysToDate(lastRenditionDate, -3) : todayValue
+    const periodStart = lastRenditionDate ?? todayValue
     const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
