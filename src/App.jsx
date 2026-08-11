@@ -388,6 +388,7 @@ function App() {
     const periodClasses = classes.filter((item) => item.date >= periodStart && item.date <= todayValue)
 
     const allPayments = periodClasses.flatMap((item) => getPayments(item))
+    const gross = allPayments.reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
     const paidPayments = allPayments.filter((payment) => payment.paid)
     const charged = paidPayments.reduce((acc, payment) => acc + Number(payment.amount ?? 0), 0)
     const cash = paidPayments
@@ -401,16 +402,19 @@ function App() {
       .filter((item) => item.date >= periodStart && item.date <= todayValue)
       .reduce((acc, item) => acc + Number(item.amount ?? 0), 0)
     const pendingToRender = Math.max(clubShare - renderedSoFar, 0)
+    const netToUser = Math.max(charged - clubShare, 0)
 
     return {
       periodStart,
       periodLabel: `Desde ${periodStart} hasta hoy`,
+      gross,
       charged,
       cash,
       transfer,
       clubShare,
       renderedSoFar,
       pendingToRender,
+      netToUser,
     }
   }, [classes, clubPercent, renditionPeriodStart, renditions])
 
@@ -756,12 +760,20 @@ function App() {
               <p>{renditionSummary.periodLabel}</p>
               <div className="weekly-summary-grid">
                 <div>
-                  <span>Lo que todavía no rendí</span>
+                  <span>Total del período</span>
+                  <strong>{money(renditionSummary.gross)}</strong>
+                </div>
+                <div>
+                  <span>Club ({clubPercent}%)</span>
+                  <strong>{money(renditionSummary.clubShare)}</strong>
+                </div>
+                <div>
+                  <span>Lo que falta rendir</span>
                   <strong>{money(renditionSummary.pendingToRender)}</strong>
                 </div>
                 <div>
-                  <span>Total del periodo</span>
-                  <strong>{money(renditionSummary.clubShare)}</strong>
+                  <span>Lo que te queda</span>
+                  <strong>{money(renditionSummary.netToUser)}</strong>
                 </div>
                 <div>
                   <span>Efectivo</span>
