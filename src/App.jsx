@@ -4,6 +4,7 @@ const CLASSES_KEY = 'facupadel_classes'
 const EXPENSES_KEY = 'facupadel_expenses'
 const CLUB_PERCENT_KEY = 'facupadel_club_percent'
 const RENDITIONS_KEY = 'facupadel_renditions'
+const PERIOD_START_KEY = 'facupadel_period_start'
 const ACCESS_PIN = '1234'
 const SHEETS_API_URL = import.meta.env.VITE_SHEETS_API_URL?.trim()
 const SHEETS_API_TOKEN = import.meta.env.VITE_SHEETS_API_TOKEN?.trim()
@@ -183,6 +184,7 @@ function App() {
   const [expenseForm, setExpenseForm] = useState(initialExpense)
   const [clubPercent, setClubPercent] = useState(40)
   const [renditions, setRenditions] = useState([])
+  const [currentPeriodStart, setCurrentPeriodStart] = useState(null)
   const [filterMonth, setFilterMonth] = useState(getLocalMonthString())
   const [syncMessage, setSyncMessage] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
@@ -244,9 +246,21 @@ function App() {
   }, [callSheetsApi, classes, cloudEnabled, expenses, pushSnapshot])
 
   useEffect(() => {
-    setClasses(parseStorage(CLASSES_KEY).map(normalizeClass))
-    setExpenses(parseStorage(EXPENSES_KEY).map(normalizeExpense))
-    setRenditions(parseStorage(RENDITIONS_KEY).map(normalizeRendition))
+    const storedClasses = parseStorage(CLASSES_KEY).map(normalizeClass)
+    const storedExpenses = parseStorage(EXPENSES_KEY).map(normalizeExpense)
+    const storedRenditions = parseStorage(RENDITIONS_KEY).map(normalizeRendition)
+
+    setClasses(storedClasses)
+    setExpenses(storedExpenses)
+    setRenditions(storedRenditions)
+
+    const savedPeriodStart = localStorage.getItem(PERIOD_START_KEY)
+    const fallbackPeriodStart = storedRenditions
+      .map((item) => item.date)
+      .sort()
+      .at(-1)
+
+    setCurrentPeriodStart(savedPeriodStart || fallbackPeriodStart || null)
 
     const savedPercentRaw = localStorage.getItem(CLUB_PERCENT_KEY)
     const savedPercent = Number(savedPercentRaw)
@@ -273,6 +287,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem(RENDITIONS_KEY, JSON.stringify(renditions))
   }, [renditions])
+
+  useEffect(() => {
+    if (currentPeriodStart) {
+      localStorage.setItem(PERIOD_START_KEY, currentPeriodStart)
+    } else {
+      localStorage.removeItem(PERIOD_START_KEY)
+    }
+  }, [currentPeriodStart])
 
   useEffect(() => {
     if (view !== 'admin' || !cloudEnabled) return
@@ -370,15 +392,10 @@ function App() {
     const weekStart = getLocalDateString(monday)
     const weekEnd = getLocalDateString(sunday)
     const todayValue = getLocalDateString(today)
-    const lastRenditionDate = renditions
-      .map((item) => item.date)
-      .sort()
-      .at(-1)
-
-    const periodStart = lastRenditionDate || weekStart
+    const periodStart = currentPeriodStart || weekStart
     const periodClasses = classes.filter((item) => {
-      if (lastRenditionDate) {
-        return item.date >= lastRenditionDate && item.date <= todayValue
+      if (currentPeriodStart) {
+        return item.date >= currentPeriodStart && item.date <= todayValue
       }
 
       return item.date >= weekStart && item.date <= weekEnd
@@ -403,7 +420,7 @@ function App() {
       weekStart,
       weekEnd,
       periodStart,
-      periodLabel: lastRenditionDate ? `Desde ${periodStart} hasta hoy` : `Semana: ${weekStart} al ${weekEnd}`,
+      periodLabel: currentPeriodStart ? `Desde ${periodStart} hasta hoy` : `Semana: ${weekStart} al ${weekEnd}`,
       charged,
       cash,
       transfer,
@@ -411,7 +428,7 @@ function App() {
       renderedThisWeek,
       pendingToRender,
     }
-  }, [classes, clubPercent, renditions])
+  }, [classes, clubPercent, currentPeriodStart, renditions])
 
   function updatePayment(index, key, value) {
     setClassForm((current) => ({
@@ -526,9 +543,10 @@ function App() {
       return
     }
 
+    const nextPeriodStart = currentPeriodStart || getLocalDateString()
     const newRendition = {
       id: crypto.randomUUID(),
-      date: getLocalDateString(),
+      date: nextPeriodStart,
       weekStart: weeklySummary.weekStart,
       weekEnd: weeklySummary.weekEnd,
       amount: weeklySummary.pendingToRender,
@@ -539,6 +557,7 @@ function App() {
 
     const nextRenditions = [newRendition, ...renditions]
     setRenditions(nextRenditions)
+    setCurrentPeriodStart(nextPeriodStart)
     setRenditionMessage(`Listo, se registró la rendición de ${money(weeklySummary.pendingToRender)}.`)
     setSyncMessage('Rendición guardada. El resumen semanal quedó listo para la próxima semana.')
   }
