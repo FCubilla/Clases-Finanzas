@@ -5,7 +5,6 @@ const EXPENSES_KEY = 'facupadel_expenses'
 const CLUB_PERCENT_KEY = 'facupadel_club_percent'
 const RENDITIONS_KEY = 'facupadel_renditions'
 const RENDITION_PERIOD_START_KEY = 'facupadel_rendition_period_start'
-const ACCESS_PIN = '1234'
 const SHEETS_API_URL = import.meta.env.VITE_SHEETS_API_URL?.trim()
 const SHEETS_API_TOKEN = import.meta.env.VITE_SHEETS_API_TOKEN?.trim()
 
@@ -51,6 +50,17 @@ function money(value) {
   }).format(value)
 }
 
+function formatRenditionTimestamp(value) {
+  const timestamp = new Date(value)
+
+  if (Number.isNaN(timestamp.getTime())) return null
+
+  return new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(timestamp)
+}
+
 function getLocalDateString(date = new Date()) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -79,12 +89,6 @@ function normalizeDateInput(value) {
 
   const parsed = new Date(year, month - 1, day)
   return getLocalDateString(parsed)
-}
-
-function addDaysToDate(value, days) {
-  const date = new Date(`${value}T12:00:00`)
-  date.setDate(date.getDate() + days)
-  return getLocalDateString(date)
 }
 
 function getPayments(item) {
@@ -163,6 +167,7 @@ function normalizeRendition(item) {
   return {
     id: item?.id ?? crypto.randomUUID(),
     date: normalizeDateInput(item?.date),
+    createdAt: item?.createdAt ?? null,
     weekStart: normalizeDateInput(item?.weekStart),
     weekEnd: normalizeDateInput(item?.weekEnd),
     amount: Number(item?.amount ?? 0),
@@ -180,10 +185,6 @@ function mergeById(localItems, remoteItems) {
 }
 
 function App() {
-  const [view, setView] = useState('public')
-  const [pin, setPin] = useState('')
-  const [pinError, setPinError] = useState('')
-
   const [classes, setClasses] = useState([])
   const [expenses, setExpenses] = useState([])
   const [classForm, setClassForm] = useState(initialClass)
@@ -214,15 +215,22 @@ function App() {
       throw new Error('No se pudo conectar con Google Sheets')
     }
 
-    return response.json()
+    const data = await response.json()
+
+    if (!data?.ok) {
+      throw new Error(data?.error || 'Google Sheets rechazo la solicitud')
+    }
+
+    return data
   }, [cloudEnabled])
 
-  const pushSnapshot = useCallback(async (nextClasses, nextExpenses) => {
+  const pushSnapshot = useCallback(async (nextClasses, nextExpenses, nextRenditions) => {
     if (!cloudEnabled) return
     await callSheetsApi({
       action: 'saveAll',
       classes: nextClasses,
       expenses: nextExpenses,
+      renditions: nextRenditions,
     })
   }, [callSheetsApi, cloudEnabled])
 
@@ -236,20 +244,23 @@ function App() {
       const data = await callSheetsApi({ action: 'getData' })
       const remoteClasses = (data?.classes ?? []).map(normalizeClass)
       const remoteExpenses = (data?.expenses ?? []).map(normalizeExpense)
+      const remoteRenditions = (data?.renditions ?? []).map(normalizeRendition)
 
       const mergedClasses = mergeById(classes, remoteClasses)
       const mergedExpenses = mergeById(expenses, remoteExpenses)
+      const mergedRenditions = mergeById(renditions, remoteRenditions)
 
       setClasses(mergedClasses)
       setExpenses(mergedExpenses)
-      await pushSnapshot(mergedClasses, mergedExpenses)
+      setRenditions(mergedRenditions)
+      await pushSnapshot(mergedClasses, mergedExpenses, mergedRenditions)
       setSyncMessage('Datos sincronizados con Google Sheets')
-    } catch {
-      setSyncMessage('No se pudo sincronizar con Google Sheets')
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : 'No se pudo sincronizar con Google Sheets')
     } finally {
       setIsSyncing(false)
     }
-  }, [callSheetsApi, classes, cloudEnabled, expenses, pushSnapshot])
+  }, [callSheetsApi, classes, cloudEnabled, expenses, pushSnapshot, renditions])
 
   useEffect(() => {
     const storedClasses = parseStorage(CLASSES_KEY).map(normalizeClass)
@@ -294,10 +305,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem(RENDITION_PERIOD_START_KEY, renditionPeriodStart)
   }, [renditionPeriodStart])
-
-  useEffect(() => {
-    if (view !== 'admin' || !cloudEnabled) return
-  }, [view, cloudEnabled])
 
   const filteredClasses = useMemo(
     () => classes.filter((item) => item.date.startsWith(filterMonth)),
@@ -418,6 +425,16 @@ function App() {
     }
   }, [classes, clubPercent, renditionPeriodStart, renditions])
 
+  const lastRendition = useMemo(
+    () =>
+      [...renditions].sort((first, second) => {
+        const firstTimestamp = new Date(first.createdAt ?? `${first.date}T00:00:00`).getTime()
+        const secondTimestamp = new Date(second.createdAt ?? `${second.date}T00:00:00`).getTime()
+        return secondTimestamp - firstTimestamp
+      })[0] ?? null,
+    [renditions],
+  )
+
   function updatePayment(index, key, value) {
     setClassForm((current) => ({
       ...current,
@@ -483,7 +500,7 @@ function App() {
     }))
 
     try {
-      await pushSnapshot(nextClasses, expenses)
+      await pushSnapshot(nextClasses, expenses, renditions)
       if (cloudEnabled) setSyncMessage('Clase guardada y subida a Sheets')
     } catch {
       if (cloudEnabled) setSyncMessage('Clase guardada localmente. Fallo al subir a Sheets')
@@ -513,7 +530,7 @@ function App() {
     }))
 
     try {
-      await pushSnapshot(classes, nextExpenses)
+      await pushSnapshot(classes, nextExpenses, renditions)
       if (cloudEnabled) setSyncMessage('Gasto guardado y subido a Sheets')
     } catch {
       if (cloudEnabled) setSyncMessage('Gasto guardado localmente. Fallo al subir a Sheets')
@@ -534,6 +551,7 @@ function App() {
     const newRendition = {
       id: crypto.randomUUID(),
       date: getLocalDateString(),
+      createdAt: new Date().toISOString(),
       weekStart: renditionSummary.periodStart,
       weekEnd: getLocalDateString(),
       amount: renditionSummary.pendingToRender,
@@ -545,7 +563,17 @@ function App() {
     const nextRenditions = [newRendition, ...renditions]
     setRenditions(nextRenditions)
     setRenditionMessage(`Listo, se registró la rendición de ${money(renditionSummary.pendingToRender)}.`)
-    setSyncMessage('Rendición guardada. El resumen quedó listo para el próximo periodo.')
+
+    try {
+      await pushSnapshot(classes, expenses, nextRenditions)
+      setSyncMessage(
+        cloudEnabled
+          ? 'Rendición guardada y subida a Sheets. El resumen quedó listo para el próximo periodo.'
+          : 'Rendición guardada. El resumen quedó listo para el próximo periodo.',
+      )
+    } catch {
+      setSyncMessage('Rendición guardada localmente. Fallo al subir a Sheets')
+    }
   }
 
   async function togglePaid(id) {
@@ -571,7 +599,7 @@ function App() {
     setClasses(nextClasses)
 
     try {
-      await pushSnapshot(nextClasses, expenses)
+      await pushSnapshot(nextClasses, expenses, renditions)
       if (cloudEnabled) setSyncMessage('Estado actualizado en Sheets')
     } catch {
       if (cloudEnabled) setSyncMessage('Estado actualizado localmente. Fallo en Sheets')
@@ -586,7 +614,7 @@ function App() {
     setClasses(nextClasses)
 
     try {
-      await pushSnapshot(nextClasses, expenses)
+      await pushSnapshot(nextClasses, expenses, renditions)
       if (cloudEnabled) setSyncMessage('Clase borrada en Sheets')
     } catch {
       if (cloudEnabled) setSyncMessage('Clase borrada localmente. Fallo en Sheets')
@@ -596,10 +624,25 @@ function App() {
   async function uploadLocalToCloud() {
     if (!cloudEnabled) return
 
+    const emptyCollections = [
+      ['clases', classes],
+      ['gastos', expenses],
+      ['rendiciones', renditions],
+    ].filter(([, items]) => items.length === 0)
+
+    if (emptyCollections.length > 0) {
+      const collectionNames = emptyCollections.map(([name]) => name).join(', ')
+      const shouldContinue = window.confirm(
+        `La información local no tiene ${collectionNames}. Si continuás, podrías borrar esos datos de Google Sheets. ¿Querés subir de todos modos?`,
+      )
+
+      if (!shouldContinue) return
+    }
+
     try {
       setIsSyncing(true)
       setSyncMessage('Subiendo datos locales...')
-      await pushSnapshot(classes, expenses)
+      await pushSnapshot(classes, expenses, renditions)
       setSyncMessage('Datos locales subidos a Google Sheets')
     } catch {
       setSyncMessage('No se pudo subir la info local a Sheets')
@@ -608,100 +651,19 @@ function App() {
     }
   }
 
-  function openAdmin() {
-    if (pin === ACCESS_PIN) {
-      setPin('')
-      setPinError('')
-      setView('admin')
-      return
-    }
-
-    setPinError('PIN incorrecto. Probá de nuevo.')
-  }
-
-  function handleBrandTap() {
-    setView('admin-login')
-  }
-
   return (
     <div className="app-shell">
       <header className="topbar">
         <p
           className="brand"
-          onClick={handleBrandTap}
           title="FacuPadel Coach"
           aria-label="FacuPadel Coach"
         >
           FacuPadel Coach
         </p>
-        <nav>
-          <button
-            type="button"
-            className={view === 'public' ? 'nav-link active' : 'nav-link'}
-            onClick={() => setView('public')}
-          >
-            Landing
-          </button>
-          <button type="button" className="admin-nav-btn" onClick={() => setView('admin-login')}>
-            Administración
-          </button>
-        </nav>
       </header>
 
-      {view === 'public' && (
-        <main className="landing">
-          <section className="hero-card">
-            <p className="kicker">Entrenador de padel</p>
-            <h1>Tu mejor nivel empieza con una clase bien enfocada</h1>
-            <p>
-              Clases individuales y grupales para mejorar tecnica, tactica y confianza en
-              cancha.
-            </p>
-            <div className="cta-row">
-              <a href="https://wa.me/5490000000000" target="_blank" rel="noreferrer">
-                Reservar por WhatsApp
-              </a>
-            </div>
-          </section>
-
-          <section className="feature-grid">
-            <article>
-              <h2>Clases a medida</h2>
-              <p>Plan de entrenamiento segun tu nivel y objetivo competitivo.</p>
-            </article>
-            <article>
-              <h2>Horarios flexibles</h2>
-              <p>Turnos de mañana y tarde para adaptarse a tu rutina.</p>
-            </article>
-            <article>
-              <h2>Seguimiento real</h2>
-              <p>Verte en torneos y medir avances en cada golpe y decisión.</p>
-            </article>
-          </section>
-        </main>
-      )}
-
-      {view === 'admin-login' && (
-        <main className="login-box">
-          <h2>Acceso al panel</h2>
-          <p>PIN inicial: 1234 (despues lo cambiamos por login real).</p>
-          <label htmlFor="pin">PIN</label>
-          <input
-            id="pin"
-            type="password"
-            value={pin}
-            onChange={(event) => setPin(event.target.value)}
-            placeholder="Escribi tu PIN"
-          />
-          {pinError && <small className="error">{pinError}</small>}
-          <button type="button" onClick={openAdmin}>
-            Entrar
-          </button>
-        </main>
-      )}
-
-      {view === 'admin' && (
-        <main className="dashboard">
+      <main className="dashboard">
           <section className="dashboard-top">
             <h2>Control financiero</h2>
             <div className="dashboard-actions">
@@ -748,6 +710,11 @@ function App() {
           <section className="single-form-section">
             <div className="weekly-summary-card">
               <h3>Resumen para rendir</h3>
+              <p className="last-rendition">
+                {lastRendition
+                  ? `Última rendición: ${formatRenditionTimestamp(lastRendition.createdAt) ?? lastRendition.date} · ${money(lastRendition.amount)}`
+                  : 'Todavía no registraste ninguna rendición.'}
+              </p>
               <div className="rendition-period-controls">
                 <label htmlFor="rendition-period-start">Desde</label>
                 <input
@@ -1066,8 +1033,7 @@ function App() {
               <button type="submit">Guardar gasto</button>
             </form>
           </section>
-        </main>
-      )}
+      </main>
     </div>
   )
 }

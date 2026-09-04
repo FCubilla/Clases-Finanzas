@@ -1,6 +1,7 @@
 const APP_TOKEN = 'facupadel_token_2026'
 const CLASSES_SHEET = 'Clases'
 const EXPENSES_SHEET = 'Gastos'
+const RENDITIONS_SHEET = 'Rendiciones'
 
 function doPost(e) {
   try {
@@ -17,12 +18,14 @@ function doPost(e) {
         ok: true,
         classes: readRows(CLASSES_SHEET),
         expenses: readRows(EXPENSES_SHEET),
+        renditions: readRows(RENDITIONS_SHEET),
       })
     }
 
     if (action === 'saveAll') {
       writeRows(CLASSES_SHEET, payload.classes || [])
       writeRows(EXPENSES_SHEET, payload.expenses || [])
+      writeRows(RENDITIONS_SHEET, payload.renditions || [])
       return json({ ok: true })
     }
 
@@ -64,6 +67,12 @@ function readRows(sheetName) {
         obj.amount = Number(obj.amount || 0)
       }
 
+      if (sheetName === RENDITIONS_SHEET) {
+        obj.amount = Number(obj.amount || 0)
+        obj.cash = Number(obj.cash || 0)
+        obj.transfer = Number(obj.transfer || 0)
+      }
+
       return obj
     })
 }
@@ -84,6 +93,10 @@ function writeRows(sheetName, rows) {
 function getHeadersFor(sheetName) {
   if (sheetName === CLASSES_SHEET) {
     return ['id', 'date', 'student', 'type', 'amount', 'paid', 'paymentMethod', 'notes']
+  }
+
+  if (sheetName === RENDITIONS_SHEET) {
+    return ['id', 'date', 'createdAt', 'weekStart', 'weekEnd', 'amount', 'cash', 'transfer', 'notes']
   }
 
   return ['id', 'date', 'concept', 'amount', 'category', 'notes']

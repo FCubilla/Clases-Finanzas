@@ -273,6 +273,15 @@ form,
   color: var(--soft);
 }
 
+.weekly-summary-card .last-rendition {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .weekly-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
